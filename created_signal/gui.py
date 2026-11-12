@@ -42,4 +42,18 @@ class SignalRecord:
 class CreatedSignalTab(QWidget):
     """Created Signal tab loaded by ``main.py``."""
 
-    
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        self.signal_records: list[SignalRecord] = []
+        self.reference_signal: Optional[np.ndarray] = None
+        self.current_signal: Optional[np.ndarray] = None
+        self.time: Optional[np.ndarray] = None
+        self.fs: Optional[float] = None
+        self.current_name = "No signal"
+
+        self._build_ui()
+        self._set_signal_controls_enabled(False)
+        self._set_status("Generate a signal to get started.")
+
+        
