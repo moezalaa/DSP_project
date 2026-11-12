@@ -445,3 +445,118 @@ class CreatedSignalTab(QWidget):
             )
         self.combine_button.setEnabled(len(self.signal_records) >= 2)
         self.clear_collection_button.setEnabled(bool(self.signal_records))
+
+    # ------------------------------------------------------------------
+    # Signal processing
+    # ------------------------------------------------------------------
+
+    def add_noise(self) -> None:
+        if not self._require_signal():
+            return
+        try:
+            processing = self._processing_module()
+            assert self.current_signal is not None
+            noisy = processing.add_noise(
+                self.current_signal.copy(), snr_db=self.noise_snr.value()
+            )
+            self._install_signal(
+                self.time, noisy, self.fs, "Noisy signal", reset_reference=False
+            )
+        except Exception as exc:
+            show_error(self, str(exc), "Could not add noise")
+
+    def apply_convolution(self) -> None:
+        if not self._require_signal():
+            return
+        try:
+            processing = self._processing_module()
+            kind = self.conv_kind.currentText()
+            kernel = None
+
+            if kind == "custom":
+                try:
+                    kernel = np.asarray(
+                        [
+                            float(value.strip())
+                            for value in self.custom_kernel.text().split(",")
+                            if value.strip()
+                        ],
+                        dtype=np.float64,
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        "Enter the custom kernel as comma-separated numbers."
+                    ) from exc
+                if kernel.size == 0:
+                    raise ValueError("The custom kernel cannot be empty.")
+
+            assert self.current_signal is not None
+            filtered = processing.apply_conv_filter(
+                self.current_signal.copy(),
+                kernel_type=kind,
+                size=self.conv_size.value(),
+                kernel=kernel,
+            )
+            self._install_signal(
+                self.time,
+                filtered,
+                self.fs,
+                f"{kind.replace('_', ' ').title()} output",
+                reset_reference=False,
+            )
+        except Exception as exc:
+            show_error(self, str(exc), "Convolution failed")
+
+    def apply_frequency_filter(self) -> None:
+        if not self._require_signal():
+            return
+        try:
+            from core.filters import apply_filter
+
+            filter_type = self.freq_filter_kind.currentText()
+            low = self.cutoff_low.value()
+
+            if filter_type == "bandpass":
+                high = self.cutoff_high.value()
+                if high <= low:
+                    raise ValueError(
+                        "For a bandpass filter, the upper cutoff must be "
+                        "greater than the lower cutoff."
+                    )
+                cutoff = (low, high)
+            else:
+                cutoff = low
+
+            order = None if self.ideal_filter.isChecked() else self.filter_order.value()
+            params = {
+                "fs": self.fs,
+                "cutoff": cutoff,
+                "order": order,
+            }
+            if filter_type == "notch":
+                params["width"] = self.notch_width.value()
+
+            assert self.current_signal is not None
+            filtered, _magnitude, _phase = apply_filter(
+                self.current_signal.copy(), filter_type, **params
+            )
+            self._install_signal(
+                self.time,
+                filtered,
+                self.fs,
+                f"{filter_type.capitalize()} filtered signal",
+                reset_reference=False,
+            )
+        except Exception as exc:
+            show_error(self, str(exc), "Frequency filtering failed")
+
+    def reset_signal(self) -> None:
+        if self.reference_signal is None or self.time is None or self.fs is None:
+            return
+        self.current_signal = self.reference_signal.copy()
+        self.current_name = "Original signal"
+        self._refresh_plots()
+        self._set_status(
+            f"Reset to original signal | {self.current_signal.size:,} samples "
+            f"| Fs = {self.fs:g} Hz"
+        )
