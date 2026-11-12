@@ -343,3 +343,105 @@ class CreatedSignalTab(QWidget):
         self._set_status(
             f"{name} | {samples.size:,} samples | Fs = {self.fs:g} Hz"
         )
+
+# ------------------------------------------------------------------
+    # Signal generation and collection
+    # ------------------------------------------------------------------
+
+    def generate_signal(self) -> None:
+        try:
+            processing = self._processing_module()
+            kind = self.signal_kind.currentText()
+            fs = self.sampling_rate.value()
+
+            time, samples = processing.generate_signal(
+                kind=kind,
+                amp=self.amplitude.value(),
+                freq=self.frequency.value(),
+                phase=self.phase.value(),
+                fs=fs,
+                duration=self.duration.value(),
+            )
+
+            self.signal_records.clear()
+            self._update_collection_label()
+            self._install_signal(
+                time, samples, fs, f"{kind.capitalize()} signal", reset_reference=True
+            )
+            self.add_signal_button.setEnabled(True)
+        except Exception as exc:
+            show_error(self, str(exc), "Signal generation failed")
+
+    def add_current_to_collection(self) -> None:
+        if not self._require_signal():
+            return
+
+        assert self.time is not None
+        assert self.current_signal is not None
+        assert self.fs is not None
+
+        record = SignalRecord(
+            time=self.time.copy(),
+            samples=self.current_signal.copy(),
+            fs=self.fs,
+            name=f"Signal {len(self.signal_records) + 1}",
+        )
+        self.signal_records.append(record)
+        self._update_collection_label()
+        self.combine_button.setEnabled(len(self.signal_records) >= 2)
+        self.clear_collection_button.setEnabled(True)
+        self._set_status(
+            f"Added {record.name} to collection ({len(self.signal_records)} total)."
+        )
+
+    def combine_signals(self) -> None:
+        if len(self.signal_records) < 2:
+            show_error(self, "Add at least two signals to the collection.")
+            return
+
+        try:
+            processing = self._processing_module()
+            first = self.signal_records[0]
+
+            for record in self.signal_records[1:]:
+                if not np.isclose(record.fs, first.fs):
+                    raise ValueError(
+                        "All signals must have the same sampling rate before "
+                        "they can be combined."
+                    )
+                if record.samples.size != first.samples.size:
+                    raise ValueError(
+                        "All signals must have the same number of samples "
+                        "before they can be combined."
+                    )
+
+            combined = processing.combine_signals(
+                [record.samples.copy() for record in self.signal_records]
+            )
+            self._install_signal(
+                first.time,
+                combined,
+                first.fs,
+                "Combined signal",
+                reset_reference=True,
+            )
+        except Exception as exc:
+            show_error(self, str(exc), "Could not combine signals")
+
+    def clear_collection(self) -> None:
+        self.signal_records.clear()
+        self._update_collection_label()
+        self.combine_button.setEnabled(False)
+        self.clear_collection_button.setEnabled(False)
+        self._set_status("Signal collection cleared.")
+
+    def _update_collection_label(self) -> None:
+        if not self.signal_records:
+            self.collection_label.setText("No generated signals yet.")
+        else:
+            names = ", ".join(record.name for record in self.signal_records)
+            self.collection_label.setText(
+                f"{len(self.signal_records)} stored: {names}"
+            )
+        self.combine_button.setEnabled(len(self.signal_records) >= 2)
+        self.clear_collection_button.setEnabled(bool(self.signal_records))
