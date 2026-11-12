@@ -72,3 +72,10 @@ def test_fft_large_awkward_lengths(n):
     X = fourier.fft(x)
     assert np.allclose(X, np.fft.fft(x), atol=1e-6)
     assert np.allclose(fourier.ifft(X).real, x, atol=1e-8)
+
+
+@pytest.mark.parametrize("n", [55125, 220500])
+def test_fft_large_lengths_with_odd_factor(n):
+    """Regression: Bluestein used int32 indices on Windows, so n*n overflowed for n > 46340."""
+    x = np.random.default_rng(7).standard_normal(n)
+    assert np.allclose(fourier.fft(x), np.fft.fft(x), atol=1e-6)
