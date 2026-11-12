@@ -131,16 +131,25 @@ def frequency_filter(img, filter_type, cutoff, kind="ideal", order=2) -> tuple:
 ## `speech_signal/processing.py`  (owner: Fatma, used by Ghada)
 
 ```python
-def load_audio(path: str) -> tuple[np.ndarray, int]:    # (mono signal in [-1, 1], fs)
-def record_audio(duration: float, fs: int = 44100) -> np.ndarray
-def save_audio(path: str, x: np.ndarray, fs: int) -> None
+def load_audio(path: str) -> tuple[np.ndarray, int]:    # (mono signal in [-1, 1], fs); stereo is averaged
+def record_audio(duration: float, fs: int = 44100) -> np.ndarray   # blocks: call it from a QThread
+def save_audio(path: str, x: np.ndarray, fs: int) -> None          # 16-bit WAV, clips to [-1, 1]
 def compute_fft(x, fs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Returns (freqs, magnitude, phase), one-sided."""
 def compute_spectrogram(x, fs, window_size=1024, hop=512) -> tuple:
-    """Returns (times, freqs, S_db). Hamming window, manual STFT."""
-def add_echo(x, fs, delay_s: float, decay: float) -> np.ndarray   # via convolution
-def reduce_noise(x, fs, method="spectral_subtraction", **params) -> np.ndarray
+    """Returns (times, freqs, S_db). Hamming window, manual STFT. S_db shape = (len(freqs), len(times))."""
+def filter_audio(x, fs, filter_type, cutoff, order=None, width=2.0) -> np.ndarray:
+    """LPF/HPF/BPF/Notch on audio (wraps core.filters.freq_filter_1d). Same length as x."""
+def add_echo(x, fs, delay_s: float, decay: float, n_echoes: int = 1) -> np.ndarray:
+    """Via convolution. Output is LONGER than x by n_echoes*round(delay_s*fs) samples (echo tail)."""
+def reduce_noise(x, fs, method="spectral_subtraction", **params) -> np.ndarray:
+    """params: alpha=2.0, beta=0.05, window_size=1024, hop=256,
+       noise_clip=<samples> | noise_duration=<seconds at start> | (default: auto from quietest frames)."""
 ```
+
+> **Change log (Fatma):** added `filter_audio` (needed for the Day 4 audio filters) and the optional
+> `n_echoes` argument of `add_echo` (default 1 keeps the old behaviour). Everything raises
+> `ValueError` on bad input, including "no microphone found" in `record_audio`.
 
 ---
 
