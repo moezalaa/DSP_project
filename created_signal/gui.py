@@ -30,3 +30,12 @@ from PyQt5.QtWidgets import (
 
 from core.gui_widgets import PlotCanvas, show_error
 
+@dataclass
+class SignalRecord:
+    """A generated signal and the parameters needed to interpret it."""
+
+    time: np.ndarray
+    samples: np.ndarray
+    fs: float
+    name: str
+
