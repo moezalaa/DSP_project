@@ -661,3 +661,18 @@ class CreatedSignalTab(QWidget):
             self._set_status(f"Saved signal to {destination.name}")
         except Exception as exc:
             show_error(self, str(exc), "Could not save signal")
+
+    # ------------------------------------------------------------------
+    # Small UI state helpers
+    # ------------------------------------------------------------------
+
+    def _update_custom_kernel_state(self, *_args) -> None:
+        is_custom = self.conv_kind.currentText() == "custom"
+        self.custom_kernel.setEnabled(is_custom)
+        self.conv_size.setEnabled(not is_custom)
+
+    def _update_frequency_filter_state(self, *_args) -> None:
+        kind = self.freq_filter_kind.currentText()
+        self.cutoff_high.setEnabled(kind == "bandpass")
+        self.notch_width.setEnabled(kind == "notch")
+        self.cutoff_low.setEnabled(True)
