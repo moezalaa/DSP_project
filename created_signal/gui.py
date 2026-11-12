@@ -615,3 +615,49 @@ class CreatedSignalTab(QWidget):
             self.canvas.draw()
         except Exception as exc:
             show_error(self, str(exc), "Could not update plots")
+
+    # ------------------------------------------------------------------
+    # Saving
+    # ------------------------------------------------------------------
+
+    def save_signal(self) -> None:
+        if not self._require_signal():
+            return
+
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save signal",
+            "created_signal.npz",
+            "NumPy archive (*.npz);;CSV file (*.csv)",
+        )
+        if not path:
+            return
+
+        try:
+            destination = Path(path)
+            if not destination.suffix:
+                destination = destination.with_suffix(
+                    ".csv" if "CSV" in selected_filter else ".npz"
+                )
+
+            assert self.current_signal is not None
+            assert self.time is not None
+            assert self.fs is not None
+
+            if destination.suffix.lower() == ".csv":
+                with destination.open("w", newline="", encoding="utf-8") as file:
+                    writer = csv.writer(file)
+                    writer.writerow(["time_seconds", "amplitude"])
+                    writer.writerows(zip(self.time, self.current_signal))
+            else:
+                np.savez(
+                    destination,
+                    time=self.time,
+                    signal=self.current_signal,
+                    fs=np.float64(self.fs),
+                    name=np.asarray(self.current_name),
+                )
+
+            self._set_status(f"Saved signal to {destination.name}")
+        except Exception as exc:
+            show_error(self, str(exc), "Could not save signal")
