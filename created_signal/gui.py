@@ -560,3 +560,58 @@ class CreatedSignalTab(QWidget):
             f"Reset to original signal | {self.current_signal.size:,} samples "
             f"| Fs = {self.fs:g} Hz"
         )
+
+    # ------------------------------------------------------------------
+    # Plotting
+    # ------------------------------------------------------------------
+
+    def _refresh_plots(self, *_args) -> None:
+        if self.current_signal is None or self.time is None or self.fs is None:
+            self.canvas.clear()
+            return
+
+        try:
+            processing = self._processing_module()
+            freqs, magnitude, phase = processing.analyze(
+                self.current_signal, self.fs
+            )
+
+            overlay = None
+            labels = ("Current", "Original")
+            if (
+                self.compare_check.isChecked()
+                and self.reference_signal is not None
+                and self.reference_signal.size == self.current_signal.size
+            ):
+                overlay = (self.time, self.reference_signal)
+
+            self.canvas.plot(
+                self.time,
+                self.current_signal,
+                index=0,
+                title=f"Time domain — {self.current_name}",
+                xlabel="Time (s)",
+                ylabel="Amplitude",
+                overlay=overlay,
+                labels=labels,
+            )
+            self.canvas.plot(
+                freqs,
+                magnitude,
+                index=1,
+                title="One-sided magnitude spectrum",
+                xlabel="Frequency (Hz)",
+                ylabel="Magnitude",
+            )
+            self.canvas.plot(
+                freqs,
+                phase,
+                index=2,
+                title="One-sided phase spectrum",
+                xlabel="Frequency (Hz)",
+                ylabel="Phase (rad)",
+            )
+            self.canvas.figure.tight_layout()
+            self.canvas.draw()
+        except Exception as exc:
+            show_error(self, str(exc), "Could not update plots")
