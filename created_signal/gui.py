@@ -39,3 +39,7 @@ class SignalRecord:
     fs: float
     name: str
 
+class CreatedSignalTab(QWidget):
+    """Created Signal tab loaded by ``main.py``."""
+
+    
