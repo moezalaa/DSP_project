@@ -269,3 +269,77 @@ class CreatedSignalTab(QWidget):
         spin.setValue(value)
         spin.setKeyboardTracking(False)
         return spin
+
+    # ------------------------------------------------------------------
+    # Processing access and state
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _processing_module():
+        try:
+            from created_signal import processing
+        except ImportError as exc:
+            raise RuntimeError(
+                "Could not import created_signal.processing. "
+                "Make sure created_signal/processing.py exists."
+            ) from exc
+        return processing
+
+    def _set_status(self, message: str) -> None:
+        self.status_label.setText(message)
+
+    def _set_signal_controls_enabled(self, enabled: bool) -> None:
+        for widget in (
+            self.add_signal_button,
+            self.noise_button,
+            self.conv_button,
+            self.frequency_filter_button,
+            self.reset_button,
+            self.save_button,
+        ):
+            widget.setEnabled(enabled)
+
+        self.compare_check.setEnabled(enabled)
+        self.combine_button.setEnabled(len(self.signal_records) >= 2)
+        self.clear_collection_button.setEnabled(bool(self.signal_records))
+
+    def _require_signal(self) -> bool:
+        if self.current_signal is None or self.fs is None or self.time is None:
+            show_error(self, "Generate or select a signal first.")
+            return False
+        return True
+
+    def _install_signal(
+        self,
+        time: np.ndarray,
+        samples: np.ndarray,
+        fs: float,
+        name: str,
+        *,
+        reset_reference: bool = True,
+    ) -> None:
+        time = np.asarray(time, dtype=np.float64).reshape(-1)
+        samples = np.asarray(samples, dtype=np.float64).reshape(-1)
+
+        if time.size != samples.size:
+            raise ValueError(
+                f"Time and signal lengths differ ({time.size} vs {samples.size})."
+            )
+        if samples.size == 0:
+            raise ValueError("The generated signal is empty.")
+        if not np.all(np.isfinite(samples)):
+            raise ValueError("The signal contains NaN or infinite values.")
+
+        self.time = time
+        self.current_signal = samples.copy()
+        self.fs = float(fs)
+        self.current_name = name
+
+        if reset_reference or self.reference_signal is None:
+            self.reference_signal = samples.copy()
+
+        self._set_signal_controls_enabled(True)
+        self._refresh_plots()
+        self._set_status(
+            f"{name} | {samples.size:,} samples | Fs = {self.fs:g} Hz"
+        )
