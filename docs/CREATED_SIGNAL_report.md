@@ -108,7 +108,7 @@ Order 0 means an ideal (brick-wall) filter, and any other number means a Butterw
 
 We verified that the peak sits at the right frequency with the right amplitude, that a cosine with a given phase shows that same value in the phase spectrum, and that a 700 Hz tone sampled at 1000 Hz shows up at 300 Hz (aliasing).
 
-### 3.7 DTFT from the definition (Moez)
+### 3.7 DTFT from the definition (omar)
 
 ```
 X(ω) = Σ  x[n] · e^(−jωn)          n = 0 .. N−1
@@ -119,7 +119,7 @@ X(ω) = Σ  x[n] · e^(−jωn)          n = 0 .. N−1
 - To protect the UI, the function refuses to run when the number of operations (samples × points) exceeds 1.5 million, instead of freezing.
 - **Verification:** the DTFT at `ω_k = 2πk/N` equals the DFT exactly. It was compared with `numpy.fft.fft` (error about `7e-13`). Tests also confirm that the DTFT of an impulse is flat, that a delayed impulse has linear phase, that a cosine peaks at the right ω with height `N/2`, and that a real signal has even magnitude and odd phase.
 
-### 3.8 Convolution vs frequency-domain multiplication (Omar)
+### 3.8 Convolution vs frequency-domain multiplication (Moez)
 
 `convolution_vs_frequency(x, h)` returns:
 
