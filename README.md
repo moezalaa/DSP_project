@@ -138,9 +138,9 @@ Create the class in your package and `main.py` picks it up automatically:
 
 | Module | Members |
 |---|---|
-| Created Signal | Member 1, Member 2 |
-| Image | Member 3, Member 4 |
-| Speech | Member 5, Member 6 |
+| Created Signal | Moez, Omar |
+| Image | Mohab, Hager |
+| Speech | Fatma, Ghada |
 
 ---
 
@@ -154,5 +154,5 @@ Create the class in your package and `main.py` picks it up automatically:
 
 ## Course
 
-Digital Signal Processing: <University / Faculty name>, <Academic year>
-Supervised by: <Dr. / Eng. name>
+Digital Signal Processing: <University / Capital University>, <Academic fall 2026-2027>
+Supervised by: < Eng. Abdelrahman Gamal>
