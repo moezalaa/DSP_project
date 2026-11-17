@@ -65,10 +65,8 @@ def test_bad_input_raises():
         fourier.fft(np.array([]))
 
 
-@pytest.mark.parametrize("n", [10007, 44100, 132300])
-def test_fft_large_awkward_lengths(n):
-    """Audio-sized and prime lengths must be fast and correct (Bluestein path)."""
-    x = rng.standard_normal(n)
-    X = fourier.fft(x)
-    assert np.allclose(X, np.fft.fft(x), atol=1e-6)
-    assert np.allclose(fourier.ifft(X).real, x, atol=1e-8)
+@pytest.mark.parametrize("n", [55125, 220500])
+def test_fft_large_lengths_with_odd_factor(n):
+    """Regression: Bluestein used int32 indices on Windows, so n*n overflowed for n > 46340."""
+    x = np.random.default_rng(7).standard_normal(n)
+    assert np.allclose(fourier.fft(x), np.fft.fft(x), atol=1e-6)

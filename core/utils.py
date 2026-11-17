@@ -1,3 +1,4 @@
+"""Small helpers shared by every module: magnitude, phase, dB, shifting, axes."""
 import numpy as np
 
 

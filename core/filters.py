@@ -24,9 +24,12 @@ def _abs_freqs(N: int, fs: float) -> np.ndarray:
     return np.minimum(k, N - k) * fs / N
 
 
+_EPS = 1e-9      # relative tolerance so a bin exactly AT the cutoff is not lost to rounding
+
+
 def _lowpass_response(f, cutoff, order):
     if order is None:                       # ideal (brick wall)
-        return (f <= cutoff).astype(float)
+        return (f <= cutoff * (1 + _EPS)).astype(float)
     return 1.0 / (1.0 + (f / cutoff) ** (2 * order))     # Butterworth
 
 
@@ -58,7 +61,7 @@ def freq_filter_1d(x, fs, filter_type, cutoff, order=None, width=2.0):
             raise ValueError("bandpass needs cutoff=(low, high)")
         if not 0 <= lo < hi:
             raise ValueError("bandpass needs 0 <= low < high")
-        H = (f >= lo) & (f <= hi) if order is None else \
+        H = (f >= lo * (1 - _EPS)) & (f <= hi * (1 + _EPS)) if order is None else \
             _lowpass_response(f, hi, order) * (1 - _lowpass_response(f, max(lo, 1e-9), order))
         H = H.astype(float)
     else:
@@ -69,7 +72,7 @@ def freq_filter_1d(x, fs, filter_type, cutoff, order=None, width=2.0):
         elif filter_type == "highpass":
             H = 1.0 - _lowpass_response(f, cutoff, order)
         else:  # notch
-            H = 1.0 - (np.abs(f - cutoff) <= width / 2).astype(float)
+            H = 1.0 - (np.abs(f - cutoff) <= width / 2 + _EPS).astype(float)
 
     X = fft(x)
     Y = X * H

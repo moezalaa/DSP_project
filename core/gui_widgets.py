@@ -25,16 +25,21 @@ class PlotCanvas(FigureCanvasQTAgg):
         self.axes = self.figure.subplots(rows, cols, squeeze=False).ravel()
 
     def plot(self, x, y, index=0, title="", xlabel="", ylabel="", stem=False,
-             overlay=None, labels=("", "")):
-        """Draw y(x) on subplot `index`. `overlay=(x2, y2)` draws a second curve."""
+             overlay=None, labels=("", ""), marker=None):
+        """Draw y(x) on subplot `index`. `overlay=(x2, y2)` draws a second curve.
+
+        marker: e.g. "o" to draw a dot on every point. Use it when y contains NaN gaps,
+        so isolated points (which have no neighbour to connect to) are still visible.
+        """
         ax = self.axes[index]
         ax.clear()
         if stem:
             ax.stem(x, y, basefmt=" ")
         else:
-            ax.plot(x, y, label=labels[0])
+            ax.plot(x, y, label=labels[0], marker=marker, markersize=4)
         if overlay is not None:
-            ax.plot(overlay[0], overlay[1], label=labels[1], alpha=0.8)
+            ax.plot(overlay[0], overlay[1], label=labels[1], alpha=0.8,
+                    marker=marker, markersize=3)
         if any(labels):
             ax.legend(loc="upper right")
         ax.set_title(title)

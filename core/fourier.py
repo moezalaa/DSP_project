@@ -14,7 +14,7 @@ import numpy as np
 
 @lru_cache(maxsize=64)
 def _dft_matrix(N: int, inverse: bool = False) -> np.ndarray:
-    n = np.arange(N)
+    n = np.arange(N, dtype=np.int64)   # int64: on Windows (numpy 1.x) the default is int32 and n*n overflows
     sign = 1.0 if inverse else -1.0
     return np.exp(sign * 2j * np.pi * ((np.outer(n, n) % N) / N))
 
@@ -52,7 +52,7 @@ def _bluestein(x: np.ndarray) -> np.ndarray:
     a prime length like 10007 stays fast and needs no N x N matrix.
     """
     N = x.shape[-1]
-    n = np.arange(N)
+    n = np.arange(N, dtype=np.int64)   # int64: on Windows (numpy 1.x) the default is int32 and n*n overflows
     w = np.exp(-1j * np.pi * ((n * n) % (2 * N)) / N)       # chirp (mod 2N keeps precision)
     M = 1 << int(np.ceil(np.log2(2 * N - 1)))               # power of two >= 2N-1
     a = np.zeros(x.shape[:-1] + (M,), dtype=complex)
