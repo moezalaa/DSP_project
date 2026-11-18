@@ -1,3 +1,11 @@
+"""DSP Project: main window with one tab per signal type.
+
+Each team writes a QWidget class in its own package:
+    created_signal/gui.py -> class CreatedSignalTab(QWidget)
+    image_signal/gui.py   -> class ImageSignalTab(QWidget)
+    speech_signal/gui.py  -> class SpeechSignalTab(QWidget)
+Until that file exists, main.py shows a placeholder, so nothing here has to change.
+"""
 import importlib
 import sys
 

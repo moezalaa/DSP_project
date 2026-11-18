@@ -81,7 +81,6 @@ opencv-python
 Pillow
 soundfile
 sounddevice
-librosa
 ```
 
 ---
@@ -108,11 +107,30 @@ output, magnitude, phase = apply_filter(signal, filter_type, **params)
 
 ## Testing
 
-Our hand-written DFT and convolution are verified against `numpy` / `scipy`:
+Our hand-written DFT, FFT, convolution and filters are verified against `numpy` / `scipy`:
 
 ```bash
-python -m pytest tests/
+python -m pytest tests/        # 200+ tests, takes a few seconds
 ```
+
+## Status
+
+| Part | Status |
+|---|---|
+| `core/` (utils, fourier, convolution, filters, gui_widgets) | Done (Day 1-2) |
+| `main.py` (3 tabs, auto-loads each team's tab) | Done (Day 1-2) |
+| Created Signal (incl. DTFT loops, conv vs FFT, difference equation, numpy/scipy comparison, GUI) | Done |
+| Image / Speech | Next |
+
+## How a team plugs its tab into `main.py`
+
+Create the class in your package and `main.py` picks it up automatically:
+
+| File | Class |
+|---|---|
+| `created_signal/gui.py` | `CreatedSignalTab(QWidget)` |
+| `image_signal/gui.py` | `ImageSignalTab(QWidget)` |
+| `speech_signal/gui.py` | `SpeechSignalTab(QWidget)` |
 
 ---
 

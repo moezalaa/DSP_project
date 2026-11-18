@@ -98,21 +98,27 @@ def apply_filter(signal, filter_type: str, **params) -> tuple:
 
 ---
 
-## `created_signal/processing.py`  (owner: Moaz, used by Omar)
+## `created_signal/`  (owners: Moaz = processing/reference/compare, Omar = gui)  DONE
 
 ```python
-def generate_signal(kind: str, amp: float, freq: float, phase: float,
-                    fs: float, duration: float) -> tuple[np.ndarray, np.ndarray]:
-    """kind: 'sine' | 'cosine' | 'square' | 'triangle' | 'sawtooth'. Returns (t, x)."""
+# processing.py   (angles in RADIANS; the GUI converts from degrees)
+def generate_signal(kind, amp, freq, phase_rad, fs, duration) -> (t, x)
+    # kind: 'sine' | 'cosine' | 'square' | 'triangle' | 'sawtooth'
+def combine_signals(signals: list) -> np.ndarray
+def add_noise(x, snr_db, seed=None) -> np.ndarray
+def apply_conv_filter(x, kernel_type, size=5, kernel=None)   # moving_average|difference|gaussian|custom
+def apply_freq_filter(x, fs, filter_type, cutoff, order=None, width=2.0)
+def first_order_difference_equation(x, a, b)                 # y[n] = a*y[n-1] + b*x[n]  (loop)
+def convolution_vs_frequency(x, h) -> dict                   # direct / padded / circular + errors
+def dtft(x, omegas) -> complex array                         # DTFT from the definition, explicit loops
+def dtft_spectrum(x, n_samples, n_points) -> (omegas, X, magnitude, phase)   # omegas in [-pi, pi]
+def apply_filter_spec(x, fs, spec: dict) -> np.ndarray       # what the GUI calls
+def analyze(x, fs) -> (freqs, amplitude_spectrum, phase)     # one-sided; sine of amp A gives peak A
+def run_pipeline(params: dict) -> dict                       # generate -> noise -> filter -> analyze
 
-def combine_signals(signals: list[np.ndarray]) -> np.ndarray
-def add_noise(x: np.ndarray, snr_db: float) -> np.ndarray
-def apply_conv_filter(x: np.ndarray, kernel_type: str, size: int = 5,
-                      kernel: np.ndarray | None = None) -> np.ndarray:
-    """kernel_type: 'moving_average' | 'difference' | 'custom'."""
-
-def analyze(x: np.ndarray, fs: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Returns (freqs, magnitude, phase), one-sided spectrum."""
+# reference.py    same operations written with numpy / scipy (independent code)
+# compare.py      compare_all(...) -> rows (time, max error, RMSE, OK) + error signals
+# gui.py          class CreatedSignalTab(QWidget): tabs "Signals", "Accuracy", "DTFT (loops)", "Convolution vs FFT"
 ```
 
 ## `image_signal/processing.py`  (owner: Mohab, used by Hagar)
@@ -155,22 +161,3 @@ def notch_coefficients(f0: float, fs, r: float | None = None, bandwidth: float =
 def apply_notch(x, fs, f0: float, r: float | None = None, bandwidth: float = 10.0) -> np.ndarray:
     """Runs the notch's difference equation sample by sample. Same length as x, clipped to [-1, 1]."""
 ```
-
-> **Change log (Fatma):** added `filter_audio` (needed for the Day 4 audio filters) and the optional
-> `n_echoes` argument of `add_echo` (default 1 keeps the old behaviour). Everything raises
-> `ValueError` on bad input, including "no microphone found" in `record_audio`.
->
-> **Change log (course-sheet audio tasks):** added `add_tone`, `find_peak_frequency`, `notch_coefficients`
-> and `apply_notch` (Student 3 = hum + peak detection, Student 4 = 2nd-order IIR notch).
-
----
-
-## Testing rule
-
-Every function in `core/` must have a test in `tests/` that compares it to `numpy` / `scipy` with `np.allclose(..., atol=1e-6)`.
-
-## Change process
-
-1. Open an Issue: "Contract change: <function>".
-2. Get a thumbs-up from the owner and the GUI member who uses it.
-3. Update this file and the code in the same Pull Request.
