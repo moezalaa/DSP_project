@@ -38,6 +38,7 @@ from core.utils import to_db
 from speech_signal import processing as sp
 
 DEFAULT_FS = 44100
+IIR_NOTCH = "notch (IIR, 2nd order)"
 
 
 class _RecordThread(QThread):
@@ -72,7 +73,9 @@ class SpeechSignalTab(QWidget):
         self.current: Optional[np.ndarray] = None
         self.fs: Optional[int] = None
         self.history: list[str] = []
-        self._orig_spectrum = None               # cache of compute_fft(original)
+        self.previous: Optional[np.ndarray] = None   # signal before the last processing step
+        self._ref_cache = (None, None)           # (reference signal, its compute_fft result)
+        self._peak_hz: Optional[float] = None    # last detected peak, drawn as a red marker
         self._record_thread: Optional[_RecordThread] = None
 
         self._build_ui()
@@ -95,6 +98,8 @@ class SpeechSignalTab(QWidget):
         lay.addWidget(self._build_input_group())
         lay.addWidget(self._build_playback_group())
         self.process_widgets = [
+            self._build_interference_group(),
+            self._build_peak_group(),
             self._build_filter_group(),
             self._build_echo_group(),
             self._build_noise_group(),
@@ -123,10 +128,12 @@ class SpeechSignalTab(QWidget):
         self.status_label.setStyleSheet("color: #666;")
         header.addWidget(self.status_label, 1)
 
-        self.compare_check = QCheckBox("Compare with original")
-        self.compare_check.setChecked(True)
-        self.compare_check.toggled.connect(self._refresh_plots)
-        header.addWidget(self.compare_check)
+        header.addWidget(QLabel("Compare with:"))
+        self.compare_combo = QComboBox()
+        self.compare_combo.addItems(["Nothing", "Original", "Previous step"])
+        self.compare_combo.setCurrentIndex(1)
+        self.compare_combo.currentIndexChanged.connect(self._refresh_plots)
+        header.addWidget(self.compare_combo)
 
         self.reset_button = QPushButton("Reset")
         self.reset_button.setToolTip("Go back to the original audio")
@@ -196,12 +203,47 @@ class SpeechSignalTab(QWidget):
             row.addWidget(b)
         return g
 
+    def _build_interference_group(self) -> QGroupBox:
+        g = QGroupBox("Interference tone")
+        form = QFormLayout(g)
+        self.tone_freq = self._double_spin(1, 96000, 50, 1, 10)
+        form.addRow("Frequency (Hz)", self.tone_freq)
+        presets = QHBoxLayout()
+        for hz in (50, 60):
+            b = QPushButton(f"{hz} Hz")
+            b.clicked.connect(lambda _=False, hz=hz: self.tone_freq.setValue(hz))
+            presets.addWidget(b)
+        form.addRow(presets)
+        self.tone_amp = self._double_spin(0.0, 1.0, 0.1, 3, 0.05)
+        form.addRow("Amplitude", self.tone_amp)
+        btn = QPushButton("Add interference")
+        btn.setToolTip("Adds a sine wave to the current audio (mains hum)")
+        btn.clicked.connect(self.apply_tone)
+        form.addRow(btn)
+        return g
+
+    def _build_peak_group(self) -> QGroupBox:
+        g = QGroupBox("Find the interference")
+        form = QFormLayout(g)
+        self.peak_from = self._double_spin(0, 192000, 20, 0, 10)
+        form.addRow("Search from (Hz)", self.peak_from)
+        self.peak_to = self._double_spin(1, 192000, 4000, 0, 100)
+        form.addRow("Search to (Hz)", self.peak_to)
+        btn = QPushButton("Find strongest frequency")
+        btn.clicked.connect(self.detect_peak)
+        form.addRow(btn)
+        self.peak_label = QLabel("")
+        self.peak_label.setWordWrap(True)
+        self.peak_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow(self.peak_label)
+        return g
+
     def _build_filter_group(self) -> QGroupBox:
         g = QGroupBox("Frequency filter")
         form = QFormLayout(g)
 
         self.filter_type = QComboBox()
-        self.filter_type.addItems(["lowpass", "highpass", "bandpass", "notch"])
+        self.filter_type.addItems(["lowpass", "highpass", "bandpass", "notch", IIR_NOTCH])
         self.filter_type.currentTextChanged.connect(self._update_filter_state)
         form.addRow("Type", self.filter_type)
 
@@ -216,6 +258,11 @@ class SpeechSignalTab(QWidget):
         self.notch_width_label = QLabel("Notch width (Hz)")
         self.notch_width = self._double_spin(0.1, 10000, 50, 1, 5)
         form.addRow(self.notch_width_label, self.notch_width)
+
+        self.iir_bw_label = QLabel("Bandwidth (Hz)")
+        self.iir_bw = self._double_spin(0.5, 5000, 10, 1, 1)
+        self.iir_bw.setToolTip("-3 dB width of the IIR notch; sets the pole radius r = 1 - pi*bw/fs")
+        form.addRow(self.iir_bw_label, self.iir_bw)
 
         self.butterworth_check = QCheckBox("Butterworth (smooth)")
         self.butterworth_check.setToolTip("Unchecked = brick-wall filter (can 'ring' near the cutoff)")
@@ -236,6 +283,12 @@ class SpeechSignalTab(QWidget):
         row.addWidget(phone)
         row.addWidget(apply_btn)
         form.addRow(row)
+
+        self.coef_label = QLabel("")
+        self.coef_label.setWordWrap(True)
+        self.coef_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.coef_label.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        form.addRow(self.coef_label)
 
         self._update_filter_state()
         return g
@@ -307,20 +360,26 @@ class SpeechSignalTab(QWidget):
     def _set_audio_controls_enabled(self, enabled: bool) -> None:
         for w in self.process_widgets:
             w.setEnabled(enabled)
-        for w in (self.compare_check, self.reset_button, self.save_button,
+        for w in (self.compare_combo, self.reset_button, self.save_button,
                   self.play_orig_button, self.play_proc_button, self.stop_button):
             w.setEnabled(enabled)
 
     def _update_filter_state(self, *_args) -> None:
         kind = self.filter_type.currentText()
         band = kind == "bandpass"
+        iir = kind == IIR_NOTCH
         self.cutoff_label.setText("Low cutoff (Hz)" if band else
-                                  "Center (Hz)" if kind == "notch" else "Cutoff (Hz)")
+                                  "Center (Hz)" if kind in ("notch", IIR_NOTCH) else "Cutoff (Hz)")
         for w in (self.cutoff_high_label, self.cutoff_high):
             w.setVisible(band)
         for w in (self.notch_width_label, self.notch_width):
             w.setVisible(kind == "notch")
-        smooth = self.butterworth_check.isChecked()
+        for w in (self.iir_bw_label, self.iir_bw):
+            w.setVisible(iir)
+        # `order` only matters for lowpass / highpass / bandpass: both notches ignore it
+        uses_order = kind not in ("notch", IIR_NOTCH)
+        self.butterworth_check.setEnabled(uses_order)
+        smooth = self.butterworth_check.isChecked() and uses_order
         self.order.setEnabled(smooth)
         self.order_label.setEnabled(smooth)
 
@@ -349,7 +408,11 @@ class SpeechSignalTab(QWidget):
         self.current = self.original.copy()
         self.fs = int(fs)
         self.history = [name]
-        self._orig_spectrum = None
+        self.previous = self.original
+        self._ref_cache = (None, None)
+        self._peak_hz = None
+        self.peak_label.setText("")
+        self.coef_label.setText("")
         self.max_freq.setValue(min(8000.0, self.fs / 2))
         self._set_audio_controls_enabled(True)
         self._set_status(f"{name}: {len(x)} samples, {self.fs} Hz, {len(x) / self.fs:.2f} s")
@@ -436,26 +499,32 @@ class SpeechSignalTab(QWidget):
     # ------------------------------------------------------------------
     # Processing buttons: each one calls ONE function of speech_signal.processing
     # ------------------------------------------------------------------
-    def _run(self, label: str, func: Callable[[np.ndarray, int], np.ndarray]) -> None:
+    def _run(self, label: str, func: Callable[[np.ndarray, int], np.ndarray]) -> bool:
+        """Run one processing step on `current`. Returns True if it succeeded."""
         if not self._require_audio():
-            return
+            return False
         self._stop()
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             y = func(self.current, self.fs)
         except ValueError as e:
             show_error(self, e)
-            return
+            return False
         finally:
             QApplication.restoreOverrideCursor()
+        self.previous = self.current
         self.current = np.asarray(y, dtype=float)
         self.history.append(label)
         self._set_status(" → ".join(self.history) + f"   ({len(self.current) / self.fs:.2f} s)")
         self._refresh_plots()
+        return True
 
     def apply_filter(self) -> None:
         kind = self.filter_type.currentText()
         low = self.cutoff.value()
+        if kind == IIR_NOTCH:
+            self._apply_iir_notch(low, self.iir_bw.value())
+            return
         if kind == "bandpass":
             high = self.cutoff_high.value()
             if low >= high:
@@ -464,10 +533,47 @@ class SpeechSignalTab(QWidget):
             cutoff, desc = (low, high), f"{low:g}–{high:g} Hz"
         else:
             cutoff, desc = low, f"{low:g} Hz"
-        order = self.order.value() if self.butterworth_check.isChecked() else None
+        order = self.order.value() if self.butterworth_check.isChecked() and kind != "notch" else None
         width = self.notch_width.value()
         label = f"{kind} {desc}" + (f" (Butterworth {order})" if order else "")
         self._run(label, lambda x, fs: sp.filter_audio(x, fs, kind, cutoff, order=order, width=width))
+
+    def _apply_iir_notch(self, f0: float, bandwidth: float) -> None:
+        if not self._require_audio():
+            return
+        try:
+            b, a = sp.notch_coefficients(f0, self.fs, bandwidth=bandwidth)
+        except ValueError as e:
+            show_error(self, e)
+            return
+        ok = self._run(f"IIR notch {f0:g} Hz",
+                       lambda x, fs: sp.apply_notch(x, fs, f0, bandwidth=bandwidth))
+        if ok:
+            self.coef_label.setText(
+                "b = [" + ", ".join(f"{v:.6f}" for v in b) + "]\n"
+                "a = [" + ", ".join(f"{v:.6f}" for v in a) + "]")
+
+    def apply_tone(self) -> None:
+        freq, amp = self.tone_freq.value(), self.tone_amp.value()
+        self._run(f"+{freq:g} Hz tone", lambda x, fs: sp.add_tone(x, fs, freq, amp))
+
+    def detect_peak(self) -> None:
+        if not self._require_audio():
+            return
+        try:
+            f = sp.find_peak_frequency(self.current, self.fs,
+                                       self.peak_from.value(), self.peak_to.value())
+        except ValueError as e:
+            show_error(self, e)
+            return
+        self._peak_hz = f
+        self.peak_label.setText(f"Strongest component: {f:.2f} Hz")
+        zoom = max(300.0, f * 6)                 # a 50 Hz tone is invisible on a 0-8000 Hz axis
+        if self.max_freq.value() > zoom:
+            self.max_freq.blockSignals(True)
+            self.max_freq.setValue(zoom)
+            self.max_freq.blockSignals(False)
+        self._refresh_plots()
 
     def apply_echo(self) -> None:
         delay, decay, n = self.echo_delay.value(), self.echo_decay.value(), self.echo_count.value()
@@ -485,7 +591,9 @@ class SpeechSignalTab(QWidget):
             return
         self._stop()
         self.current = self.original.copy()
+        self.previous = self.original
         self.history = self.history[:1]
+        self.coef_label.setText("")
         self._set_status(f"{self.history[0]}: back to the original.")
         self._refresh_plots()
 
@@ -508,26 +616,39 @@ class SpeechSignalTab(QWidget):
         except ValueError as e:
             show_error(self, e)
 
+    def _comparison_reference(self):
+        """(signal, name) to overlay on the plots, or (None, "") for no overlay."""
+        mode = self.compare_combo.currentIndex()       # 0 nothing, 1 original, 2 previous step
+        if mode == 0 or not self._is_modified:
+            return None, ""
+        return (self.original, "Original") if mode == 1 else (self.previous, "Previous step")
+
     def _draw_time_and_spectrum(self) -> None:
         x, fs = self.current, self.fs
-        compare = self.compare_check.isChecked() and self._is_modified
+        ref, ref_name = self._comparison_reference()
+        compare = ref is not None
         fmax = min(self.max_freq.value(), fs / 2)
 
         t = np.arange(len(x)) / fs
-        t0 = np.arange(len(self.original)) / fs
-        labels = ("Processed", "Original") if compare else ("", "")
+        labels = ("Processed", ref_name) if compare else ("", "")
+        overlay = (np.arange(len(ref)) / fs, ref) if compare else None
         self.canvas.plot(t, x, index=0, title="Waveform", xlabel="Time (s)", ylabel="Amplitude",
-                         overlay=(t0, self.original) if compare else None, labels=labels)
+                         overlay=overlay, labels=labels)
 
         f, mag, ph = sp.compute_fft(x, fs)
-        if self._orig_spectrum is None and compare:
-            self._orig_spectrum = sp.compute_fft(self.original, fs)
+        spec_overlay = None
         as_db = self.db_check.isChecked()
         scale = (lambda m: to_db(m)) if as_db else (lambda m: m)
-        overlay = (self._orig_spectrum[0], scale(self._orig_spectrum[1])) if compare else None
+        if compare:
+            if self._ref_cache[0] is not ref:
+                self._ref_cache = (ref, sp.compute_fft(ref, fs))
+            rf, rmag, _ = self._ref_cache[1]
+            spec_overlay = (rf, scale(rmag))
         self.canvas.plot(f, scale(mag), index=1, title="Magnitude spectrum", xlabel="Frequency (Hz)",
-                         ylabel="dB" if as_db else "|X|", overlay=overlay, labels=labels)
+                         ylabel="dB" if as_db else "|X|", overlay=spec_overlay, labels=labels)
         self.canvas.plot(f, ph, index=2, title="Phase spectrum", xlabel="Frequency (Hz)", ylabel="rad")
+        if self._peak_hz is not None:
+            self.canvas.axes[1].axvline(self._peak_hz, color="red", linestyle="--", linewidth=1)
         for ax in self.canvas.axes[1:]:
             ax.set_xlim(0, fmax)
         self.canvas.draw_idle()

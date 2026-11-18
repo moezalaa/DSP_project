@@ -145,11 +145,23 @@ def add_echo(x, fs, delay_s: float, decay: float, n_echoes: int = 1) -> np.ndarr
 def reduce_noise(x, fs, method="spectral_subtraction", **params) -> np.ndarray:
     """params: alpha=2.0, beta=0.05, window_size=1024, hop=256,
        noise_clip=<samples> | noise_duration=<seconds at start> | (default: auto from quietest frames)."""
+def add_tone(x, fs, freq: float, amplitude: float = 0.1, phase_rad: float = 0.0) -> np.ndarray:
+    """Adds amplitude*sin(2*pi*freq*n/fs + phase_rad) (mains hum 50/60 Hz). Same length, clipped to [-1, 1]."""
+def find_peak_frequency(x, fs, fmin: float = 20.0, fmax: float | None = None) -> float:
+    """Frequency (Hz) of the strongest FFT bin inside [fmin, fmax] (fmax=None -> fs/2)."""
+def notch_coefficients(f0: float, fs, r: float | None = None, bandwidth: float = 10.0) -> tuple[np.ndarray, np.ndarray]:
+    """2nd-order IIR notch. Returns (b, a): b=[1, -2cos(w0), 1], a=[1, -2r cos(w0), r^2], w0=2*pi*f0/fs.
+       r=None -> r = 1 - pi*bandwidth/fs. r must be in (0, 1) (stable)."""
+def apply_notch(x, fs, f0: float, r: float | None = None, bandwidth: float = 10.0) -> np.ndarray:
+    """Runs the notch's difference equation sample by sample. Same length as x, clipped to [-1, 1]."""
 ```
 
 > **Change log (Fatma):** added `filter_audio` (needed for the Day 4 audio filters) and the optional
 > `n_echoes` argument of `add_echo` (default 1 keeps the old behaviour). Everything raises
 > `ValueError` on bad input, including "no microphone found" in `record_audio`.
+>
+> **Change log (course-sheet audio tasks):** added `add_tone`, `find_peak_frequency`, `notch_coefficients`
+> and `apply_notch` (Student 3 = hum + peak detection, Student 4 = 2nd-order IIR notch).
 
 ---
 

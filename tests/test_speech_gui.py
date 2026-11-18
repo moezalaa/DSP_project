@@ -1,5 +1,8 @@
 """Smoke tests for the Speech tab (offscreen, no display or microphone needed)."""
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # project root
 
 import numpy as np
 import pytest
@@ -7,7 +10,6 @@ import pytest
 pytest.importorskip("PyQt5")
 from PyQt5.QtWidgets import QApplication  # noqa: E402
 
-import core.gui_widgets as gw  # noqa: E402
 from speech_signal.gui import SpeechSignalTab  # noqa: E402
 
 app = QApplication.instance() or QApplication([])
@@ -75,3 +77,50 @@ def test_missing_file_shows_message(errors):
 def test_apply_without_audio_shows_message(errors):
     SpeechSignalTab().apply_echo()
     assert errors
+
+
+# ---------------------------------------------------------- hum / notch workflow
+def test_add_tone_find_peak_and_iir_notch(tab, errors):
+    tab.tone_freq.setValue(50); tab.tone_amp.setValue(0.1)
+    tab.apply_tone()
+    tab.detect_peak()
+    assert abs(tab._peak_hz - 50) < 0.5 and "50" in tab.peak_label.text()
+
+    tab.filter_type.setCurrentText("notch (IIR, 2nd order)")
+    tab.cutoff.setValue(tab._peak_hz); tab.iir_bw.setValue(10)
+    tab.apply_filter()
+    assert not errors
+    assert tab.coef_label.text().startswith("b = [") and "a = [" in tab.coef_label.text()
+    assert len(tab.history) == 3
+    # the 50 Hz bin is far smaller after the notch than in the noisy signal
+    def hum(x):
+        X = np.abs(np.fft.rfft(x))
+        return X[int(round(50 * len(x) / tab.fs))]
+    assert hum(tab.current) < 0.01 * hum(tab.previous)
+
+
+def test_compare_modes_and_filter_controls_draw(tab, errors):
+    tab.apply_tone()
+    tab.filter_type.setCurrentText("notch (IIR, 2nd order)")
+    assert tab.iir_bw.isVisibleTo(tab) and not tab.butterworth_check.isEnabled()
+    tab.apply_filter()
+    for mode in (0, 1, 2):
+        tab.compare_combo.setCurrentIndex(mode)
+    tab.reset_audio()
+    assert tab.coef_label.text() == ""
+    assert not errors
+
+
+def test_new_controls_report_errors_instead_of_crashing(tab, errors):
+    tab.tone_freq.setValue(30000)                    # above Nyquist (22050)
+    tab.apply_tone()
+    tab.filter_type.setCurrentText("notch (IIR, 2nd order)")
+    tab.cutoff.setValue(30000)
+    tab.apply_filter()
+    assert len(errors) == 2
+
+
+def test_hum_tools_without_audio_show_message(errors):
+    t = SpeechSignalTab()
+    t.detect_peak(); t.apply_tone(); t.apply_filter()
+    assert len(errors) == 3

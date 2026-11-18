@@ -344,3 +344,91 @@ def reduce_noise(x, fs, method="spectral_subtraction", **params):
         wsum[sl] += w
     out = out / np.maximum(wsum, 1e-3)
     return out[pad_left:pad_left + n]
+
+
+# ----------------------------------------------------------------------------
+# Interference tone, peak detection and the second-order IIR notch filter
+# (course sheet: Student 3 = Audio Analysis, Student 4 = Audio Filtering)
+# ----------------------------------------------------------------------------
+def add_tone(x, fs, freq, amplitude=0.1, phase_rad=0.0):
+    """Add a sinusoidal interference tone (e.g. 50 or 60 Hz mains hum) to x.
+
+        y[n] = x[n] + amplitude * sin(2*pi*freq*n/fs + phase_rad)
+
+    Returns an array of the same length as x, clipped to [-1, 1].
+    freq must be in (0, fs/2) so the tone does not alias.
+    """
+    x = _check_signal(x)
+    _check_fs(fs)
+    if not 0 < freq < fs / 2.0:
+        raise ValueError(f"Tone frequency must be between 0 and the Nyquist frequency ({fs / 2.0:g} Hz)")
+    if amplitude < 0:
+        raise ValueError("Tone amplitude must be >= 0")
+    n = np.arange(len(x))
+    return np.clip(x + amplitude * np.sin(2 * np.pi * freq * n / fs + phase_rad), -1.0, 1.0)
+
+
+def find_peak_frequency(x, fs, fmin=20.0, fmax=None):
+    """Frequency (Hz) of the strongest spectral component of x inside [fmin, fmax].
+
+    Uses compute_fft. The default fmin=20 Hz skips the DC offset, so a mains-hum
+    tone added to a recording shows up as the peak. fmax=None means fs/2.
+    """
+    freqs, mag, _ = compute_fft(x, fs)
+    fmax = freqs[-1] if fmax is None else float(fmax)
+    if fmin < 0 or fmax <= fmin:
+        raise ValueError("Need 0 <= fmin < fmax")
+    inside = (freqs >= fmin) & (freqs <= fmax)
+    if not inside.any():
+        raise ValueError("No frequency bins fall inside the requested range")
+    return float(freqs[np.argmax(np.where(inside, mag, -np.inf))])
+
+
+def notch_coefficients(f0, fs, r=None, bandwidth=10.0):
+    """Coefficients of a second-order IIR notch filter centred at f0 (Hz).
+
+        H(z) = (1 - 2cos(w0) z^-1 + z^-2) / (1 - 2 r cos(w0) z^-1 + r^2 z^-2),   w0 = 2*pi*f0/fs
+
+    Zeros sit ON the unit circle at +-w0 (so the gain at f0 is exactly 0); the
+    poles sit at radius r just inside it (so the notch is narrow and the filter is
+    stable for 0 < r < 1). If r is None it is chosen from the -3 dB `bandwidth` in
+    Hz:  r = 1 - pi*bandwidth/fs.
+
+    Returns (b, a) with b = [1, -2cos(w0), 1] and a = [1, -2r cos(w0), r^2], so
+        y[n] = b0 x[n] + b1 x[n-1] + b2 x[n-2] - a1 y[n-1] - a2 y[n-2].
+    """
+    _check_fs(fs)
+    if not 0 < f0 < fs / 2.0:
+        raise ValueError(f"Notch frequency must be between 0 and the Nyquist frequency ({fs / 2.0:g} Hz)")
+    if r is None:
+        if bandwidth <= 0:
+            raise ValueError("Notch bandwidth must be positive")
+        r = 1.0 - np.pi * bandwidth / fs
+    if not 0 < r < 1:
+        raise ValueError("Pole radius r must be in (0, 1); use a smaller bandwidth or a larger r < 1")
+    w0 = 2.0 * np.pi * f0 / fs
+    b = np.array([1.0, -2.0 * np.cos(w0), 1.0])
+    a = np.array([1.0, -2.0 * r * np.cos(w0), r * r])
+    return b, a
+
+
+def apply_notch(x, fs, f0, r=None, bandwidth=10.0):
+    """Remove the frequency f0 from x with the second-order IIR notch filter.
+
+    The difference equation is run sample by sample (zero initial state):
+        y[n] = b0 x[n] + b1 x[n-1] + b2 x[n-2] - a1 y[n-1] - a2 y[n-2]
+    Returns an array of the same length as x, clipped to [-1, 1].
+    See notch_coefficients for f0, r and bandwidth.
+    """
+    x = _check_signal(x)
+    b, a = notch_coefficients(f0, fs, r=r, bandwidth=bandwidth)
+    b0, b1, b2 = b
+    a1, a2 = a[1], a[2]
+    y = np.empty(len(x))
+    x1 = x2 = y1 = y2 = 0.0                       # previous inputs / outputs
+    for n, xn in enumerate(x.tolist()):
+        yn = b0 * xn + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        y[n] = yn
+        x2, x1 = x1, xn
+        y2, y1 = y1, yn
+    return np.clip(y, -1.0, 1.0)
