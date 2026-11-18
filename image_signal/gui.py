@@ -5,8 +5,11 @@ from PyQt5.QtWidgets import (
     QComboBox, QSpinBox, QDoubleSpinBox
 )
 
+from .denoising import (add_periodic_noise, analyze_noisy_image, remove_periodic_noise)
 from core.gui_widgets import ImageCanvas, show_error
 from .processing import load_image, spatial_filter, image_fft, frequency_filter
+from scripts.compare_image import calculate_metrics
+
 
 
 class ImageSignalTab(QWidget):
@@ -16,6 +19,7 @@ class ImageSignalTab(QWidget):
 
         self.original_image = None
         self.processed_image = None
+        self.noisy_image = None
 
         self.init_ui()
 
@@ -123,7 +127,57 @@ class ImageSignalTab(QWidget):
         self.freq_button.clicked.connect(self.apply_frequency_filter)
         freq_layout.addWidget(self.freq_button)
 
+
         main_layout.addLayout(freq_layout)
+
+        # Periodic Noise Controls
+        noise_layout = QHBoxLayout()
+
+        noise_layout.addWidget(QLabel("Noise Amplitude:"))
+
+        self.noise_amplitude = QDoubleSpinBox()
+        self.noise_amplitude.setRange(0, 255)
+        self.noise_amplitude.setValue(30)
+        noise_layout.addWidget(self.noise_amplitude)
+
+        noise_layout.addWidget(QLabel("Frequency X:"))
+
+        self.noise_fx = QSpinBox()
+        self.noise_fx.setRange(1, 100)
+        self.noise_fx.setValue(8)
+        noise_layout.addWidget(self.noise_fx)
+
+        noise_layout.addWidget(QLabel("Frequency Y:"))
+
+        self.noise_fy = QSpinBox()
+        self.noise_fy.setRange(1, 100)
+        self.noise_fy.setValue(6)
+        noise_layout.addWidget(self.noise_fy)
+
+        self.add_noise_button = QPushButton("Add Periodic Noise")
+        self.add_noise_button.clicked.connect(self.add_noise)
+        noise_layout.addWidget(self.add_noise_button)
+
+        main_layout.addLayout(noise_layout)
+
+
+        # Noise Removal Controls
+        remove_noise_layout = QHBoxLayout()
+
+        remove_noise_layout.addWidget(QLabel("Notch Radius:"))
+
+        self.notch_radius = QSpinBox()
+        self.notch_radius.setRange(1, 20)
+        self.notch_radius.setValue(3)
+
+        remove_noise_layout.addWidget(self.notch_radius)
+
+        self.remove_noise_button = QPushButton("Remove Periodic Noise")
+        self.remove_noise_button.clicked.connect(self.remove_noise)
+
+        remove_noise_layout.addWidget(self.remove_noise_button)
+
+        main_layout.addLayout(remove_noise_layout)
 
         # Image Canvases
         images_layout = QGridLayout()
@@ -279,6 +333,83 @@ class ImageSignalTab(QWidget):
 
         except Exception as e:
             show_error(self, e, "Frequency Filter Error")
+
+    def add_noise(self):
+
+        if self.original_image is None:
+            show_error(self, "Please load an image first.")
+            return
+
+        try:
+            self.noisy_image = add_periodic_noise(
+                self.original_image,
+                amplitude=self.noise_amplitude.value(),
+                fx=self.noise_fx.value(),
+                fy=self.noise_fy.value()
+            )
+
+            self.processed_image = self.noisy_image
+
+            self.processed_canvas.show_image(
+                self.noisy_image,
+                "Image with Periodic Noise"
+            )
+
+            _, log_magnitude = analyze_noisy_image(self.noisy_image)
+
+            self.magnitude_canvas.show_image(
+                log_magnitude,
+                "Noisy Image - FFT Spectrum"
+            )
+
+            self.status_label.setText(
+                "Periodic noise added successfully."
+            )
+
+        except Exception as e:
+            show_error(self, e, "Noise Error")
+
+
+    def remove_noise(self):
+
+        if self.noisy_image is None:
+            show_error(self, "Please add periodic noise first.")
+            return
+
+        try:
+            restored, mask = remove_periodic_noise(
+                self.noisy_image,
+                fx=self.noise_fx.value(),
+                fy=self.noise_fy.value(),
+                radius=self.notch_radius.value()
+            )
+
+            self.processed_image = restored
+
+            self.processed_canvas.show_image(
+                restored,
+                "Restored Image"
+            )
+
+            _, log_magnitude = analyze_noisy_image(self.noisy_image)
+
+            self.magnitude_canvas.show_image(
+                log_magnitude,
+                "Noisy Image - FFT Spectrum"
+            )
+
+            mae, rmse, max_error, psnr = calculate_metrics(
+                restored,
+                self.original_image
+            )
+
+            self.status_label.setText(
+                f"Restored | RMSE: {rmse:.2f} | PSNR: {psnr:.2f} dB"
+            )
+
+        except Exception as e:
+            show_error(self, e, "Noise Removal Error")
+
 
     def reset_image(self):
 

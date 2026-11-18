@@ -10,7 +10,7 @@ from image_signal import (
     image_fft,
     frequency_filter
 )
-from scripts.demo_image import IMAGE_PATH
+
 
 
 # ----------------------------------
