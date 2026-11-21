@@ -1,9 +1,3 @@
-"""Created Signal: generation, noise, filtering and analysis (pure functions, no GUI).
-
-Angles are in RADIANS here (the GUI converts from degrees).
-All filtering is done with our own core/ code (core.convolution, core.filters,
-core.fourier), never with numpy/scipy.
-"""
 import math
 
 import numpy as np

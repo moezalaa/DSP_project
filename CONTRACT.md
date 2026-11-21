@@ -98,7 +98,7 @@ def apply_filter(signal, filter_type: str, **params) -> tuple:
 
 ---
 
-## `created_signal/`  (owners: Moaz = processing/reference/compare, Omar = gui)  DONE
+## `created_signal/`  (owners: Moaz = processing/reference/compare, Omar = gui) 
 
 ```python
 # processing.py   (angles in RADIANS; the GUI converts from degrees)
@@ -121,7 +121,7 @@ def run_pipeline(params: dict) -> dict                       # generate -> noise
 # gui.py          class CreatedSignalTab(QWidget): tabs "Signals", "Accuracy", "DTFT (loops)", "Convolution vs FFT"
 ```
 
-## `image_signal/processing.py`  (owner: Mohab, used by Hagar)
+## `image_signal/processing.py`  (owner: Hager (Core), used by Mohab (GUI))
 
 ```python
 def load_image(path: str) -> np.ndarray:            # grayscale float64 [0, 255]
@@ -134,7 +134,7 @@ def frequency_filter(img, filter_type, cutoff, kind="ideal", order=2) -> tuple:
     """Returns (output_img, log_magnitude_of_output, phase_of_output)."""
 ```
 
-## `speech_signal/processing.py`  (owner: Fatma, used by Ghada)
+## `speech_signal/processing.py`  (owner: Fatma (Core), used by Ghada (GUI))
 
 ```python
 def load_audio(path: str) -> tuple[np.ndarray, int]:    # (mono signal in [-1, 1], fs); stereo is averaged

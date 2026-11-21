@@ -1,8 +1,3 @@
-"""Accuracy + speed comparison: OUR from-scratch code vs numpy / scipy.
-
-compare_all(...) returns table rows (what the GUI shows) and the error signals
-(what the GUI plots).
-"""
 import time
 
 import numpy as np

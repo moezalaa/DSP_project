@@ -1,8 +1,3 @@
-"""Created Signal tab (PyQt5): build a signal, add noise, filter it, see
-time / magnitude / phase, and compare our code against numpy / scipy.
-
-main.py loads CreatedSignalTab automatically.
-"""
 import numpy as np
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor

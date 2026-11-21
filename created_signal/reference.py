@@ -1,8 +1,3 @@
-"""Reference implementations of the SAME operations using numpy / scipy.
-
-They are written independently from our own code on purpose (different library
-calls), so comparing the two tells us how accurate our from-scratch versions are.
-"""
 import numpy as np
 from scipy import signal as sps
 

@@ -247,17 +247,9 @@ The whole project currently has **208 passing tests** (one is skipped on purpose
 
 ---
 
-## 8. Key design decisions (for the discussion)
 
-- **The FFT is hand-written:** radix-2 Cooley-Tukey, halving the length while it is even, a DFT matrix for small pieces, and Bluestein for large odd ones. It works for any length without padding the signal.
-- **The DTFT uses loops** (required by the brief). Other operations are allowed to use numpy/scipy, but we still wrote them by hand and then compared them with the libraries.
-- **An independent reference:** the numpy/scipy code uses different library calls from ours.
-- **Amplitude spectrum instead of the raw FFT:** so a peak equals the true amplitude of the component.
-- **Computation separated from the UI:** all functions are free of PyQt, so they are easy to test and reuse.
 
----
-
-## 9. Current limitations
+## 8. Current limitations
 
 - The GUI supports up to 3 components at once (the function itself supports more).
 - Sampling rate is limited to the slider range (100 to 10,000 Hz) and duration to 5 seconds so live updates stay smooth.
@@ -267,9 +259,4 @@ The whole project currently has **208 passing tests** (one is skipped on purpose
 
 ---
 
-## 10. Conclusion
-
-The Created Signal module is complete and meets the brief for Students 1 and 2: a two-sinusoid signal with Gaussian noise, a loop-based DTFT with magnitude and phase, moving average through linear convolution, a comparison of time-domain convolution with frequency-domain multiplication that shows the role of zero-padding, and a first-order difference equation. The hand-written code matches the standard libraries to about `7e-13` in the worst case, is covered by automated tests, and is ready to connect with Speech and Image because the Core is shared.
-
----
 
