@@ -49,29 +49,26 @@ Everything is also compared against numpy/scipy in the "Accuracy" tab .
 Extras the team added: low/high/band-pass, echo (convolution), spectral-subtraction noise reduction, spectrogram.
 
 
-## Image (Hagar = core, Mohab = GUI): Done 
+## Image (Hager = core, Mohab = GUI): DONE
 
-### Hager: 2D Fourier & Image Filtering: DONE
+### Hager: 2D Fourier & Image Filtering
 | Brief requirement | Where |
 |---|---|
-| Load an image and convert it to grayscale | `processing.load_image` (see gap 1: 16-bit files) |
+| Load an image and convert it to grayscale | `processing.load_image` (RGB, RGBA, palette, 1-bit, 16-bit and float files) |
 | 2D Fourier spectrum with fft2 and fftshift | `processing.image_fft` / "Analyze FFT" (log magnitude + phase) |
-| Ideal circular low-pass and high-pass masks | `frequency_filter(kind="ideal")` / "Frequency filter" box (also Gaussian and Butterworth) |
+| Ideal circular low-pass and high-pass masks, filtered images shown | `frequency_filter(kind="ideal")` / "Frequency filter" box (Gaussian and Butterworth too) |
 
-### Mohab: Image Noise Removal & Evaluation: works, but 3 gaps
-| Brief requirement | Where | Status |
-|---|---|---|
-| Periodic sinusoidal noise | `denoising.add_periodic_noise` | done 
-| Display the noisy image spectrum | "Add Periodic Noise" shows it | done |
-| Notch mask from the known noise frequency | `denoising.create_notch_mask` | done |
-| Inverse 2D FFT, compare original / noisy / restored | `remove_periodic_noise` | done
-| MSE and PSNR | status line shows RMSE and PSNR | # issue
+### Mohab: Image Noise Removal & Evaluation
+| Brief requirement | Where |
+|---|---|
+| Periodic sinusoidal noise | `denoising.add_periodic_noise` (frequency must be below half the image size) |
+| Noisy image spectrum | shown by "Add Periodic Noise" and again next to the restored spectrum |
+| Notch mask from the known noise frequency | `denoising.create_notch_mask`, displayed in the third column |
+| Inverse 2D FFT; compare original, noisy and restored | "Remove Periodic Noise": original / restored / noisy side by side, with both spectra and the mask |
+| MSE and PSNR | `image_signal/metrics.py`; the status line shows MSE, RMSE and PSNR, before and after |
 
-### Gaps (tests marked `xfail(strict=True)` in tests/test_image_*.py: they start failing as soon as a gap is fixed, so remove the mark then)
-1. `load_image`: 16-bit grayscale PNG/TIFF loads as all-white.
-2. `add_periodic_noise`: fx or fy above half the image size aliases; the notch is then built in the wrong place and nothing is restored, silently.
-3. GUI: after "Remove Periodic Noise" the noisy image is no longer visible; also loading a new image keeps the old noisy one (shape-mismatch error).
-Also: `scripts/compare_image.py` reports a false error of about 265 for sobel_x / sobel_y (the reference clips, ours is signed).
+Run `python scripts/check_brief.py` to re-check all 19 programming tasks of the brief on the real code.
+ 
 
 
 
