@@ -1,3 +1,4 @@
+import numpy as np
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QPushButton, QFileDialog, QGroupBox, QScrollArea, QFrame,
@@ -7,7 +8,7 @@ from PyQt5.QtWidgets import (
 from .denoising import (add_periodic_noise, analyze_noisy_image, remove_periodic_noise)
 from core.gui_widgets import ImageCanvas, show_error
 from .processing import load_image, spatial_filter, image_fft, frequency_filter
-from scripts.compare_image import calculate_metrics
+from .metrics import image_metrics
 
 
 PANEL_WIDTH = 400
@@ -199,15 +200,23 @@ class ImageSignalTab(QWidget):
         self.phase_canvas = ImageCanvas("FFT - Phase")
         self.magnitude_canvas = ImageCanvas("Filtered Magnitude")
 
+        # Third column: only used by the noise-removal comparison (original | restored | noisy)
+        self.noisy_canvas = ImageCanvas("Noisy Image")
+        self.mask_canvas = ImageCanvas("Notch Mask")
+
         images_layout.addWidget(self.original_canvas, 0, 0)
         images_layout.addWidget(self.processed_canvas, 0, 1)
+        images_layout.addWidget(self.noisy_canvas, 0, 2)
         images_layout.addWidget(self.magnitude_canvas, 1, 0)
         images_layout.addWidget(self.phase_canvas, 1, 1)
+        images_layout.addWidget(self.mask_canvas, 1, 2)
 
         images_layout.setRowStretch(0, 1)
         images_layout.setRowStretch(1, 1)
         images_layout.setColumnStretch(0, 1)
         images_layout.setColumnStretch(1, 1)
+        images_layout.setColumnStretch(2, 1)
+        self._set_extra_canvases(False)
 
         root.addLayout(images_layout, 1)  # stretch=1 -> takes all remaining width
 
@@ -219,6 +228,20 @@ class ImageSignalTab(QWidget):
         self.processed_canvas.clear()
         self.magnitude_canvas.clear()
         self.phase_canvas.clear()
+        self._set_extra_canvases(False)
+
+    def _set_extra_canvases(self, visible):
+        """Show / hide the third column (noisy image + notch mask)."""
+        for canvas in (self.noisy_canvas, self.mask_canvas):
+            if not visible:
+                canvas.clear()
+            canvas.setVisible(visible)
+
+    def _set_noise_limits(self):
+        """Noise frequencies (cycles per image) must stay below half the image size."""
+        rows, cols = self.original_image.shape
+        self.noise_fx.setMaximum(max(1, int(np.ceil(cols / 2)) - 1))
+        self.noise_fy.setMaximum(max(1, int(np.ceil(rows / 2)) - 1))
 
     # ------------------------------------------------------------------
     # Logic
@@ -238,15 +261,15 @@ class ImageSignalTab(QWidget):
         try:
             self.original_image = load_image(file_path)
             self.processed_image = None
+            self.noisy_image = None
+            self._set_noise_limits()
 
             self.original_canvas.show_image(
                 self.original_image,
                 "Original Image"
             )
 
-            self.processed_canvas.clear()
-            self.phase_canvas.clear()
-            self.magnitude_canvas.clear()
+            self._clear_outputs()
 
             self.status_label.setText("Image loaded successfully.")
 
@@ -337,6 +360,7 @@ class ImageSignalTab(QWidget):
             )
 
             self.processed_image = output
+            self._set_extra_canvases(False)
 
             self.processed_canvas.show_image(
                 output,
@@ -416,25 +440,26 @@ class ImageSignalTab(QWidget):
 
             self._clear_outputs()
 
-            self.processed_canvas.show_image(
-                restored,
-                "Restored Image"
-            )
+            # Row 0: original | restored | noisy      Row 1: restored spectrum | noisy spectrum | notch mask
+            self.processed_canvas.show_image(restored, "Restored Image")
+            self.noisy_canvas.show_image(self.noisy_image, "Noisy Image")
 
             _, restored_magnitude, _ = image_fft(restored)
+            self.magnitude_canvas.show_image(restored_magnitude, "Restored Image - FFT Spectrum")
 
-            self.magnitude_canvas.show_image(
-                restored_magnitude,
-                "Restored Image - FFT Spectrum"
-            )
+            _, noisy_magnitude = analyze_noisy_image(self.noisy_image)
+            self.phase_canvas.show_image(noisy_magnitude, "Noisy Image - FFT Spectrum")
 
-            mae, rmse, max_error, psnr = calculate_metrics(
-                restored,
-                self.original_image
-            )
+            self.mask_canvas.show_image(mask, "Notch Mask")
+            self._set_extra_canvases(True)
+
+            after = image_metrics(restored, self.original_image)
+            before = image_metrics(self.noisy_image, self.original_image)
 
             self.status_label.setText(
-                f"Restored | RMSE: {rmse:.2f} | PSNR: {psnr:.2f} dB"
+                f"Restored | MSE: {after['mse']:.2f} | RMSE: {after['rmse']:.2f} | "
+                f"PSNR: {after['psnr']:.2f} dB  (noisy: MSE {before['mse']:.2f}, "
+                f"PSNR {before['psnr']:.2f} dB)"
             )
 
         except Exception as e:
@@ -453,9 +478,7 @@ class ImageSignalTab(QWidget):
             "Original Image"
         )
 
-        self.processed_canvas.clear()
-        self.phase_canvas.clear()
-        self.magnitude_canvas.clear()
+        self._clear_outputs()
 
         self.status_label.setText("Image reset successfully.")
 
@@ -478,10 +501,19 @@ class ImageSignalTab(QWidget):
         try:
             from PIL import Image
 
-            image = self.processed_image.clip(0, 255).astype("uint8")
+            data = np.asarray(self.processed_image, dtype=np.float64)
+            rescaled = data.min() < 0
+            if rescaled:
+                # signed result (e.g. Sobel X/Y): a PNG cannot hold negatives, so map to 0..255
+                span = data.max() - data.min()
+                data = (data - data.min()) / (span if span > 0 else 1.0) * 255.0
+            image = np.rint(np.clip(data, 0, 255)).astype("uint8")
             Image.fromarray(image).save(file_path)
 
-            self.status_label.setText("Image saved successfully.")
+            self.status_label.setText(
+                "Image saved successfully."
+                + (" (signed result rescaled to 0-255)" if rescaled else "")
+            )
 
         except Exception as e:
             show_error(self, e, "Save Error")

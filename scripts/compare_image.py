@@ -14,25 +14,10 @@ from image_signal import (
 
 
 # ----------------------------------
-# Comparison metrics
+# Comparison metrics (now defined in image_signal/metrics.py; re-exported here)
 # ----------------------------------
 
-def calculate_metrics(ours, reference):
-    ours = np.asarray(ours)
-    reference = np.asarray(reference)
-
-    difference = np.abs(ours - reference)
-
-    mae = np.mean(difference)
-    rmse = np.sqrt(np.mean(difference ** 2))
-    max_error = np.max(difference)
-
-    if rmse == 0:
-        psnr = float("inf")
-    else:
-        psnr = 20 * np.log10(255.0 / rmse)
-
-    return mae, rmse, max_error, psnr
+from image_signal.metrics import calculate_metrics  # noqa: E402,F401
 
 
 def compare(name, ours, reference):
@@ -137,6 +122,9 @@ def reference_spatial_filter(img, name, size=3, sigma=1.0):
         kernel = kernels[name]
 
     result = reference_convolution(img, kernel)
+
+    if name in ("sobel_x", "sobel_y"):
+        return result            # signed, exactly like image_signal.spatial_filter
 
     if name == "laplacian":
         result = np.abs(result)

@@ -1,10 +1,4 @@
 
-"""Image-processing core API for the GUI.
-
-Images are 2D grayscale float64 arrays. Input pixel values are expected in
-[0, 255]. Functions return arrays/data only; this module has no GUI dependency.
-"""
-
 from pathlib import Path
 import numpy as np
 from PIL import Image
@@ -47,6 +41,16 @@ def load_image(path: str) -> np.ndarray:
 
     try:
         with Image.open(path) as source:
+            if source.mode in ("I;16", "I;16L", "I;16B", "I", "F"):
+                # 16/32-bit integer or float grayscale: PIL's convert("L") would clip
+                # everything above 255 (the picture would come out all white).
+                data = np.asarray(source, dtype=np.float64)
+                if source.mode == "F":
+                    scale = 255.0 if data.max() <= 1.0 else 1.0
+                else:
+                    scale = 255.0 / 65535.0 if data.max() > 255 else 1.0
+                return np.clip(data * scale, 0.0, 255.0).copy()
+
             return np.asarray(
                 source.convert("L"),
                 dtype=np.float64

@@ -3,6 +3,16 @@ from core.utils import fftshift, magnitude,ifftshift
 import numpy as np
 
 
+def _check_frequency(shape, fx, fy):
+    """Frequencies are in cycles per image. Above half the image size they alias."""
+    rows, cols = shape
+    if not (0 < fx < cols / 2 and 0 < fy < rows / 2):
+        raise ValueError(
+            f"Noise frequency must satisfy 0 < fx < {cols / 2:g} and 0 < fy < {rows / 2:g} "
+            f"for a {cols}x{rows} image: higher frequencies alias, so the noise would not "
+            f"sit where the notch is built")
+
+
 def add_periodic_noise(img, amplitude=30, fx=8, fy=6):
     """
     Add periodic sinusoidal noise to a grayscale image.
@@ -23,6 +33,7 @@ def add_periodic_noise(img, amplitude=30, fx=8, fy=6):
         raise ValueError("Amplitude must be non-negative")
 
     rows, cols = image.shape
+    _check_frequency(image.shape, fx, fy)
 
     x = np.arange(cols)
     y = np.arange(rows)
@@ -55,6 +66,12 @@ def analyze_noisy_image(noisy_img):
 
 
 def create_notch_mask(shape, fx=8, fy=6, radius=3):
+    """Mask of ones with two zero discs (radius in pixels) at the spectrum peaks (+-fx, +-fy)."""
+    if len(shape) != 2 or min(shape) < 1:
+        raise ValueError("shape must be (rows, cols) of a non-empty image")
+    if radius <= 0:
+        raise ValueError("Notch radius must be positive")
+    _check_frequency(shape, fx, fy)
     rows, cols = shape
 
     y, x = np.ogrid[:rows, :cols]
@@ -82,6 +99,13 @@ def create_notch_mask(shape, fx=8, fy=6, radius=3):
 
 
 def remove_periodic_noise(noisy_img, fx=8, fy=6, radius=3):
+    """Notch the known noise peaks out of the spectrum and go back with the inverse FFT.
+
+    Returns (restored_image, notch_mask).
+    """
+    noisy_img = np.asarray(noisy_img, dtype=np.float64)
+    if noisy_img.ndim != 2 or noisy_img.size == 0:
+        raise ValueError("Image must be a non-empty grayscale image")
     spectrum = fftshift(fft2(noisy_img))
 
     mask = create_notch_mask(

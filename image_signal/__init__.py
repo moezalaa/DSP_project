@@ -1,4 +1,5 @@
-"""Image signal module (assumed exports: the team's __init__.py was not sent, scripts import these four)."""
+"""Image signal module: grayscale images, 2D FFT, filters, periodic-noise removal and metrics."""
 from .processing import load_image, spatial_filter, image_fft, frequency_filter
+from .metrics import mse, psnr, image_metrics
 
-__all__ = ["load_image", "spatial_filter", "image_fft", "frequency_filter"]
+__all__ = ["load_image", "spatial_filter", "image_fft", "frequency_filter", "mse", "psnr", "image_metrics"]
