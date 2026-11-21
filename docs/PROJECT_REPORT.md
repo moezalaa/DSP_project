@@ -2,11 +2,11 @@
 
 **Team (6 students, three pairs):**
 
-| Domain | Core (algorithms) | GUI | Brief roles covered |
-|---|---|---|---|
-| Created Signal |  Omar (Mathematical Signal & DTFT), Moez(Convolution & Difference Equations) |
-| Speech / Audio |  Ghada (Audio Analysis), Fatma(Audio Filtering) |
-| Image |           Hager (2D Fourier & Image Filtering), Mohab (Image Noise Removal & Evaluation) |
+| Domain | Core (algorithms) | GUI | 
+|---|---|---|
+| Created Signal |  Omar (Mathematical Signal & DTFT), Moez(Convolution & Difference Equations) |Omar
+| Speech / Audio |  Ghada (Audio Analysis), Fatma(Audio Filtering) |Ghada
+| Image |           Hager (2D Fourier & Image Filtering), Mohab (Image Noise Removal & Evaluation) |Mohab
 
 ---
 
