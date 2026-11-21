@@ -14,7 +14,7 @@ This file is the agreement between the Core and GUI members. **Do not change a s
 
 ---
 
-## `core/fourier.py`  (owner: Moaz)
+## `core/fourier.py`  (owner: Moez)
 
 ```python
 def dft(x: np.ndarray) -> np.ndarray:
@@ -98,7 +98,7 @@ def apply_filter(signal, filter_type: str, **params) -> tuple:
 
 ---
 
-## `created_signal/`  (owners: Moaz = processing/reference/compare, Omar = gui) 
+## `created_signal/`  (owners: Moez = processing/reference/compare, Omar = gui) 
 
 ```python
 # processing.py   (angles in RADIANS; the GUI converts from degrees)

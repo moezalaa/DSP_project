@@ -1,6 +1,6 @@
 # Created Signal Module Report: DSP Project
 
-**Owners:** Moaz (Core: generation, filters, analysis, comparison) and Omar (GUI)
+**Owners:** Moez (Core: generation, filters, analysis, comparison) and Omar (GUI)
 **Brief roles covered:**  (Mathematical Signal & DTFT) +  (Convolution & Difference Equations)
 
 ---
@@ -42,7 +42,7 @@ Build a Python application that generates a 1D digital signal from user-defined 
 
 ---
 
-## 3. Moaz's part: the Core
+## 3. Moez's part: the Core
 
 ### 3.1 Signal generation
 

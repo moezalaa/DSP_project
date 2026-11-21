@@ -4,7 +4,7 @@ The brief splits the work into 6 student roles. Our three teams cover them like 
 
 | Team | Brief roles |
 |---|---|
-| Created Signal (Moaz, Omar) | Omar (Mathematical signal & DTFT) + Moez(Convolution & difference equations) |
+| Created Signal (Moez, Omar) | Omar (Mathematical signal & DTFT) + Moez(Convolution & difference equations) |
 | Speech (Fatma, Ghada) | Ghada (Audio analysis) + Fatma (Audio filtering) |
 | Image (Mohab, Hagar) | Hager (2D Fourier & image filtering) + Mohab (Image noise removal & evaluation) |
 
