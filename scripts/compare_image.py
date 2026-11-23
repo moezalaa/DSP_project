@@ -189,7 +189,7 @@ def reference_frequency_filter(
 def main():
 
     # Load the real test image
-    IMAGE_PATH = Path(__file__).with_name("test_image.jpg")
+    IMAGE_PATH = Path(__file__).parent.parent / "assets" / "test_image.jpg"
 
     img = load_image(IMAGE_PATH)
 

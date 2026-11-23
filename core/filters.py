@@ -1,10 +1,3 @@
-"""Frequency-domain filters for 1D signals and 2D images (built on core.fourier).
-
-1D : freq_filter_1d   -> lowpass / highpass / bandpass / notch
-2D : freq_mask_2d     -> Ideal / Gaussian / Butterworth masks (centered)
-     freq_filter_2d   -> applies a mask to an image
-apply_filter(...)     -> one entry point for the GUI: returns (output, magnitude, phase)
-"""
 import numpy as np
 
 from core.fourier import fft, ifft, fft2, ifft2

@@ -1,12 +1,3 @@
-"""Speech tab (PyQt5): load / record audio, play it, filter it, add echo,
-reduce noise, and look at the waveform, magnitude, phase and spectrogram.
-
-Used by main.py as  ("Speech", "speech_signal.gui", "SpeechSignalTab").
-
-Rule from CONTRACT.md: this file does NO signal processing. Every calculation
-is a call into speech_signal.processing; the GUI only collects parameters,
-catches ValueError (-> message box) and draws the returned arrays.
-"""
 from __future__ import annotations
 
 from typing import Callable, Optional

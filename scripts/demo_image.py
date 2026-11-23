@@ -11,7 +11,7 @@ from image_signal import (
 )
 
 # Load your image
-IMAGE_PATH = Path(__file__).with_name("test_image.jpg")
+IMAGE_PATH = Path(__file__).parent.parent / "assets" / "test_image.jpg"
 img = load_image(IMAGE_PATH)
 
 # Apply spatial filters

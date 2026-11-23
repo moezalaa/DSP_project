@@ -5,7 +5,7 @@ from scripts.compare_image import calculate_metrics
 
 import matplotlib.pyplot as plt
 
-img = load_image("scripts/test_image.jpg")
+img = load_image("assets/test_image.jpg")
 
 noisy = add_periodic_noise(
     img,

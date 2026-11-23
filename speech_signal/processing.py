@@ -1,15 +1,3 @@
-"""Speech core: audio I/O, spectra, filters, echo and noise reduction.
-
-Owner: Fatma.  Used by: Ghada (speech_signal/gui.py).
-
-Rules (see CONTRACT.md):
-  * Audio is a mono float64 numpy array with values in [-1, 1].
-  * Nothing here opens a window or plots; functions only return data.
-  * Bad input raises ValueError with a clear message (the GUI shows it).
-
-Everything is built on OUR OWN core modules (core.fourier, core.convolution,
-core.filters, core.utils), not on numpy.fft / scipy.signal.
-"""
 import numpy as np
 
 from core.convolution import convolve1d

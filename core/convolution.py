@@ -1,9 +1,3 @@
-"""1D and 2D convolution written from scratch (no numpy.convolve / scipy inside).
-
-Both use the "shift and add" form: for every kernel tap we add a scaled,
-shifted copy of the input. It is the exact convolution sum, but vectorized,
-so it is fast enough for full-size images.
-"""
 import numpy as np
 
 

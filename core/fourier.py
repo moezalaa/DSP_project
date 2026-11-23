@@ -1,12 +1,3 @@
-"""Fourier transforms written from scratch (no numpy.fft inside).
-
-dft / idft : direct O(N^2) definition, used as a reference.
-fft / ifft : recursive Cooley-Tukey radix-2 (decimation in time).
-             Works for ANY length: the recursion halves the length while it is
-             even; pieces of length <= 64 are finished with a small DFT matrix,
-             and a long odd piece is handled by Bluestein's chirp-z algorithm.
-fft2/ifft2 : 2D transform = FFT on every row, then on every column.
-"""
 from functools import lru_cache
 
 import numpy as np
